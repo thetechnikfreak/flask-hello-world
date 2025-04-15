@@ -1,0 +1,14 @@
+<h1>🗓️ Mamoba Feed</h1>
+<ul>
+  {% for event in events %}
+    <li>
+      <strong>{{ event.title }}</strong><br>
+      {{ event.description }}<br>
+      📆 {{ event.date }}
+      {% if event.image %}
+        <div><img src="{{ event.image }}" alt="Bild" style="max-width:100px;"></div>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>
+<a href="/">⬅ Zurück</a>
