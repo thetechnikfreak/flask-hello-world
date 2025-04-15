@@ -1,2 +1,4 @@
-Flask
-Gunicorn
+flask
+python-pptx
+feedparser
+requests
