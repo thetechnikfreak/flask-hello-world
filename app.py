@@ -5,6 +5,7 @@ from pptx.util import Inches
 import requests
 from io import BytesIO
 import tempfile
+import os
 
 app = Flask(__name__)
 
@@ -12,41 +13,49 @@ app = Flask(__name__)
 def generate_pptx():
     feed_url = request.args.get('url')
     if not feed_url:
-        return "Bitte ?url= angeben", 400
+        return "Bitte ?url= übergeben, z.B. /generate-pptx?url=https://example.com/feed.php", 400
 
+    # Parse RSS
     feed = feedparser.parse(feed_url)
+    if not feed.entries:
+        return "Keine Einträge im Feed gefunden.", 404
+
     prs = Presentation()
 
     for entry in feed.entries:
-        slide = prs.slides.add_slide(prs.slide_layouts[5])  # Leer
-        title = entry.title
-        desc = entry.description
-        img_url = None
+        slide = prs.slides.add_slide(prs.slide_layouts[5])  # Leere Folie
 
-        # Bild suchen (enclosure oder im description-HTML)
-        if 'enclosures' in entry and entry.enclosures:
-            img_url = entry.enclosures[0].href
+        # Titel + Beschreibung
+        title = entry.get("title", "")[:30]
+        desc = entry.get("summary", "")[:143]
 
-        # Textbox
-        txBox = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1))
+        # Textbox hinzufügen
+        txBox = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(8), Inches(1.5))
         tf = txBox.text_frame
         tf.text = title + "\n" + desc
 
-        # Bild hinzufügen
+        # Bild extrahieren (wenn vorhanden)
+        img_url = None
+        if 'enclosures' in entry and entry.enclosures:
+            img_url = entry.enclosures[0].get("href")
+
         if img_url:
             try:
                 img_data = requests.get(img_url).content
                 img_stream = BytesIO(img_data)
-                slide.shapes.add_picture(img_stream, Inches(2), Inches(2), Inches(4), Inches(4))
+                slide.shapes.add_picture(img_stream, Inches(3), Inches(2), Inches(4), Inches(4))
             except Exception as e:
-                print(f"Fehler beim Bild: {e}")
+                print(f"Fehler beim Bildabruf: {e}")
 
-    # Temporäre Datei
-    temp = tempfile.NamedTemporaryFile(delete=False, suffix='.pptx')
-    prs.save(temp.name)
-    return send_file(temp.name, as_attachment=True, download_name="veranstaltungen.pptx")
+    # PPTX temporär speichern
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pptx")
+    prs.save(tmp.name)
+    return send_file(tmp.name, as_attachment=True, download_name="veranstaltungen.pptx")
 
 @app.route('/')
-def hello():
-    return 'Nutze /generate-pptx?url=https://...'
+def index():
+    return "✅ PPTX-Generator läuft. Nutze /generate-pptx?url=https://..."
 
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
